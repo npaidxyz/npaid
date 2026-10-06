@@ -105,20 +105,20 @@ function start(req, res, env) {
   const location = `${authorize.toString()}&scope=${encodeURIComponent("users.read tweet.read offline.access")}`;
   res.statusCode = 302;
   res.setHeader("Location", location);
-  res.setHeader("Set-Cookie", cookie(OAUTH_COOKIE, JSON.stringify({ state, verifier, redirect }), 600));
+  res.setHeader("Set-Cookie", cookie(OAUTH_COOKIE, JSON.stringify({ state, verifier, redirect }), 600, req));
   res.end();
   return true;
 }
 
 async function callback(req, res, env, store, url) {
   if (url.searchParams.get("error")) {
-    redirectAccount(res, "denied", clearCookie(OAUTH_COOKIE));
+    redirectAccount(res, "denied", clearCookie(OAUTH_COOKIE, req));
     return true;
   }
   const pending = readOauthCookie(req);
   const code = url.searchParams.get("code");
   if (!pending || pending.state !== url.searchParams.get("state") || !code) {
-    redirectAccount(res, "state", clearCookie(OAUTH_COOKIE));
+    redirectAccount(res, "state", clearCookie(OAUTH_COOKIE, req));
     return true;
   }
   const token = await exchangeToken(env, {
@@ -128,19 +128,19 @@ async function callback(req, res, env, store, url) {
     code_verifier: pending.verifier,
   });
   if (!token?.access_token) {
-    redirectAccount(res, "token", clearCookie(OAUTH_COOKIE));
+    redirectAccount(res, "token", clearCookie(OAUTH_COOKIE, req));
     return true;
   }
   const profile = await fetchProfile(token.access_token);
   if (!profile) {
-    redirectAccount(res, "token", clearCookie(OAUTH_COOKIE));
+    redirectAccount(res, "token", clearCookie(OAUTH_COOKIE, req));
     return true;
   }
   const id = randomBytes(24).toString("base64url");
-  store.writeSession(id, sessionFromToken(profile, token));
+  await store.writeSession(id, sessionFromToken(profile, token));
   res.statusCode = 302;
   res.setHeader("Location", "/account");
-  res.setHeader("Set-Cookie", [cookie(SESSION_COOKIE, id, 60 * 60 * 24 * 30), clearCookie(OAUTH_COOKIE)]);
+  res.setHeader("Set-Cookie", [cookie(SESSION_COOKIE, id, 60 * 60 * 24 * 30, req), clearCookie(OAUTH_COOKIE, req)]);
   res.end();
   return true;
 }
@@ -184,7 +184,7 @@ async function nonce(req, res, store) {
     `Wallet: ${wallet}`,
     `Nonce: ${nonceValue}`,
   ].join("\n");
-  store.writeSession(session.id, {
+  await store.writeSession(session.id, {
     ...session,
     pending: { wallet, message, expiresAt: Date.now() + 5 * 60 * 1000 },
   });
@@ -210,8 +210,8 @@ async function link(req, res, store) {
     sendJson(res, 409, { error: bound.error });
     return true;
   }
-  store.writeLinks(bound.links);
-  store.writeSession(session.id, { ...session, pending: null });
+  await store.writeLinks(bound.links);
+  await store.writeSession(session.id, { ...session, pending: null });
   sendJson(res, 200, {
     userId: session.userId,
     username: session.username,
@@ -220,11 +220,11 @@ async function link(req, res, store) {
   return true;
 }
 
-function logout(req, res, store) {
+async function logout(req, res, store) {
   const id = readCookies(req)[SESSION_COOKIE];
-  if (id) store.deleteSession(id);
+  if (id) await store.deleteSession(id);
   res.statusCode = 204;
-  res.setHeader("Set-Cookie", clearCookie(SESSION_COOKIE));
+  res.setHeader("Set-Cookie", clearCookie(SESSION_COOKIE, req));
   res.end();
   return true;
 }
@@ -234,7 +234,7 @@ async function liveSession(req, env, store) {
   if (!session) return null;
   if (session.expiresAt > Date.now() + 60_000) return session;
   if (!session.refreshToken) {
-    store.deleteSession(session.id);
+    await store.deleteSession(session.id);
     return null;
   }
   const token = await exchangeToken(env, {
@@ -242,11 +242,11 @@ async function liveSession(req, env, store) {
     refresh_token: session.refreshToken,
   });
   if (!token?.access_token) {
-    store.deleteSession(session.id);
+    await store.deleteSession(session.id);
     return null;
   }
   const next = { ...session, ...sessionFromToken({ id: session.userId, username: session.username }, token) };
-  store.writeSession(session.id, next);
+  await store.writeSession(session.id, next);
   return next;
 }
 
@@ -304,8 +304,10 @@ function missingConfig(env) {
 
 function redirectUri(env, req) {
   if (env.X_REDIRECT_URI) return env.X_REDIRECT_URI;
-  const host = req.headers.host || "localhost:5173";
-  return `http://${host}/api/x/callback`;
+  const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost:5173";
+  const forwarded = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0].trim();
+  const proto = forwarded === "https" ? "https" : "http";
+  return `${proto}://${host}/api/x/callback`;
 }
 
 function redirectAccount(res, code, setCookie) {
@@ -338,12 +340,18 @@ function readCookies(req) {
   return out;
 }
 
-function cookie(name, value, maxAge) {
-  return `${name}=${encodeURIComponent(value)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
+function cookie(name, value, maxAge, req) {
+  return `${name}=${encodeURIComponent(value)}; ${cookieAttrs(req)}; Max-Age=${maxAge}`;
 }
 
-function clearCookie(name) {
-  return `${name}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`;
+function clearCookie(name, req) {
+  return `${name}=; ${cookieAttrs(req)}; Max-Age=0`;
+}
+
+function cookieAttrs(req) {
+  const proto = String(req?.headers?.["x-forwarded-proto"] ?? "").split(",")[0].trim();
+  const secure = proto === "https" ? "; Secure" : "";
+  return `HttpOnly; Path=/; SameSite=Lax${secure}`;
 }
 
 async function readJson(req) {

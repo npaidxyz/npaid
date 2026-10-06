@@ -28,3 +28,18 @@ create table if not exists public.claims (
 
 alter table public.raids enable row level security;
 alter table public.claims enable row level security;
+
+create table if not exists public.sessions (
+  id text primary key,
+  payload jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.wallet_links (
+  user_id text primary key,
+  wallet text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.sessions enable row level security;
+alter table public.wallet_links enable row level security;

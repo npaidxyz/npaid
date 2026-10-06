@@ -4,7 +4,7 @@ import { useNpaid } from "../context.js";
 import { shortAddress } from "../npaid";
 
 const THEME_KEY = "npaid.theme";
-const CONTRACT = "coming soon";
+const CONTRACT = "5BUxBjowbY3wiGUsCRRYWx6B9n1ffmwr3bMyU8RPpump";
 
 function storedTheme() {
   const saved = localStorage.getItem(THEME_KEY);
@@ -54,9 +54,9 @@ export default function Frame({ children }) {
           <a className="brand-x" href="https://x.com/NPaidxyz" target="_blank" rel="noreferrer" aria-label="NPaid on X">
             <XIcon />
           </a>
-          <button type="button" className="brand-ca" onClick={copyContract}>
+          <button type="button" className="brand-ca" title={CONTRACT} onClick={copyContract}>
             <span>CA</span>
-            <span>{copied ? "Copied" : CONTRACT}</span>
+            <span>{copied ? "Copied" : shortAddress(CONTRACT)}</span>
           </button>
         </div>
         <div className="cluster">

@@ -74,13 +74,56 @@ button { cursor: pointer; }
   align-items: center;
   justify-content: center;
 }
-.mark {
+.brand {
   grid-column: 1;
   justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mark {
   text-decoration: none;
   font-weight: 800;
   letter-spacing: -0.05em;
   font-size: 1.35rem;
+}
+.brand-x {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+.brand-x svg { width: 13px; height: 13px; display: block; }
+.brand-x:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+.brand-ca {
+  height: 28px;
+  max-width: 11rem;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.brand-ca span:first-child { color: var(--ink); }
+.brand-ca:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: var(--glow);
 }
 .theme {
   width: 36px;
@@ -486,7 +529,7 @@ input, select {
 
 @media (max-width: 800px) {
   .top { display: flex; flex-wrap: wrap; align-items: center; }
-  .mark { margin-right: auto; }
+  .brand { margin-right: auto; }
   .cluster { width: 100%; justify-content: center; }
   .session { width: auto; justify-content: flex-end; }
   .session > :not(.theme) { width: 8.6rem; }
@@ -521,6 +564,8 @@ input, select {
 .split .panel:nth-child(2) { animation-delay: 0.08s; }
 
 .mark,
+.brand-x,
+.brand-ca,
 .nav a,
 .pill,
 .raid-row,
@@ -622,6 +667,8 @@ select:focus {
   .docs > section { animation: none; }
   body,
   .mark,
+  .brand-x,
+  .brand-ca,
   .theme,
   .nav a,
   .pill,
